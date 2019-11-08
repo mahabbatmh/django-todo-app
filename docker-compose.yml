@@ -1,0 +1,78 @@
+version: '3'
+services:
+  nginx:
+    image: nginx:alpine
+    container_name: todoapp_nginx
+    networks:
+      - todoapp_network
+    ports:
+      - "8012:8012"
+    volumes:
+      - ./src:/src
+      - ./config/nginx:/etc/nginx/conf.d
+    depends_on:
+      - app
+  app:
+    build: .
+    container_name: todoapp
+    env_file:
+      - .env
+    networks:
+      - todoapp_network
+    depends_on:
+      - postgres
+      - redis
+      - rabbitmq
+    volumes:
+      - ./src:/src
+    expose:
+      - "8012"
+    links:
+      - redis
+      - rabbitmq
+    restart: on-failure
+  postgres:
+    image: postgres:latest
+    container_name: todoapp_postgres
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=secret_password
+      - POSTGRES_DB=postgres
+    networks:
+      - todoapp_network
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgresql-data:/var/lib/postgresql/data
+    restart: on-failure
+  redis:
+    image: redis:alpine
+    container_name: todoapp_redis
+    networks:
+      - todoapp_network
+    ports:
+     - '6379:6379'
+  rabbitmq:
+    container_name: todoapp_rabbitmq
+    image: bitnami/rabbitmq:3.7.14
+    user: root
+    ports:
+      - 15672:15672
+      - 5672:5672
+    volumes:
+      - rabbitmq-vol:/bitnami
+    environment:
+      RABBITMQ_USER: user
+      RABBITMQ_PASSWORD: secret_password
+      RABBITMQ_MANAGER_PORT_NUMBER: 8821
+    hostname: rabbitmq
+    networks:
+      - todoapp_network
+    restart: on-failure
+
+networks:
+  todoapp_network:
+
+volumes:
+  postgresql-data:
+  rabbitmq-vol:

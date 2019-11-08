@@ -1,0 +1,99 @@
+{% extends 'index.html' %}
+{% load static %}
+{% block content %}
+    <div class="container">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">{{todo.title }}</h5>
+                <p class="card-text">{{ todo.description }}</p>
+                <span class="text-muted">{{ todo.complete_date }}</span>
+            </div>
+
+{#            <div class="card-footer">#}
+{#                <div class="container">#}
+{#            <div class="row">#}
+{#                <div class="col-md-8">#}
+{#                  <div class="page-header">#}
+{#                    <h1><small class="pull-right">45 comments</small> Comments </h1>#}
+{#                  </div>#}
+{#                   <div class="comments-list">#}
+{#                       <div class="media">#}
+{#                           <p class="pull-right"><small>5 days ago</small></p>#}
+{#                            <a class="media-left" href="#">#}
+{#                              <img src="http://lorempixel.com/40/40/people/1/">#}
+{#                            </a>#}
+{#                            <div class="media-body">#}
+{##}
+{#                              <h4 class="media-heading user_name">Baltej Singh</h4>#}
+{#                              Wow! this is really great.#}
+{#                            </div>#}
+{#                       </div>#}
+{#                </div>#}
+{#                </div>#}
+{#            </div>#}
+{#        </div>#}
+{#                <form method="post" action="{% url 'todos-comments' todo-id=todo.id %}" id="comment-form">#}
+{#                    <div class="form-group">#}
+{#                        <label for="user-comment" class="form-label">Comment</label>#}
+{#                        <input id="user-comment" type="text" class="form-control">#}
+{#                        <button class="btn btn-info">Comment</button>#}
+{#                    </div>#}
+{#                </form>#}
+{#            </div>#}
+        </div>
+        <div class="row">
+            {% for user in users %}
+                <div class="col-4 form-check">
+                    <input id="user_{{ user.id }}" {% if user.has_access %}
+                           checked
+                    {% endif %}
+                                               data-user_id="{{ user.id }}"
+                           data-todo_id="{{ todo.id }}"
+                           class="form-check-input todo-user"  type="checkbox"/>
+                    <label for="user_{{ user.id }}" class="form-check-label">{{ user.email }}</label>
+                </div>
+            {% endfor %}
+
+        </div>
+    </div>
+{% endblock %}
+    {% block scripts %}
+        {% csrf_token %}
+        <script>
+
+        {#let socket = new WebSocket("ws://127.0.0.1:8012/comments/{{ todo.id }}");#}
+        {#socket.onopen = function () {#}
+        {#    console.log('Socket working....');#}
+        {#};#}
+        {#socket.onmessage = function (event) {#}
+        {#    console.log(event.data);#}
+        {#};#}
+        {#$('#comment-form').submit(function (event) {#}
+        {#    event.preventDefault();#}
+        {#    let message_data = {#}
+        {#        'comment': $("#user-comment").val(),#}
+        {#        'user_id': {{  user.id }}#}
+        {#    };#}
+        {#    socket.send(JSON.stringify(message_data));#}
+        {#    $('#comment-form')[0].reset();#}
+        {#});#}
+
+
+
+        $(document).ready(function () {
+            $(".todo-user").change(function () {
+                    $.ajax({
+                        url: '/todo-user-rel',
+                        type: 'POST',
+                        data: {
+                            "user_id": this.dataset['user_id'],
+                            "todo_id": this.dataset['todo_id'],
+                            'csrfmiddlewaretoken': '{{csrf_token}}',
+                            del:this.checked
+                        },
+                        dataType: 'json'
+                    })
+            })
+        });
+        </script>
+    {% endblock %}

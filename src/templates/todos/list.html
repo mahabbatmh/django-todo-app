@@ -1,0 +1,34 @@
+{% extends 'index.html' %}
+
+{% block content %}
+    <nav class="navbar navbar-expand-lg navbar-light bg-light">
+      <button class="navbar-brand btn">{{ user.email }}</button>
+          <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNavDropdown" aria-controls="navbarNavDropdown" aria-expanded="false" aria-label="Toggle navigation">
+    <span class="navbar-toggler-icon"></span>
+  </button>
+  <div class="collapse navbar-collapse" id="navbarNavDropdown">
+    <ul class="navbar-nav">
+      <li class="nav-item active">
+        <a class="nav-link btn btn-success text-white" href="{% url 'todos-create' %}">Create Todo <span class="sr-only">(current)</span></a>
+      </li>
+    </ul>
+  </div>
+        <a href="{%   url 'logout' %}" class="btn btn-dark">Log out</a>
+    </nav>
+    <div class="container">
+        <h1>Todo List</h1>
+        <div class="row">
+            {% for todo_user in todo_users %}
+                <a  style="text-decoration: none" class="col-4 mb-3" href="{% url 'todos-edit' id=todo_user.todo.id %}">
+                    <div class="card">
+                      <div class="card-body">
+                        <h5 class="card-title">{{ todo_user.todo.title }}</h5>
+                        <p class="card-text">{{ todo_user.todo.description }}</p>
+                        <span class="text-muted">{{ todo_user.todo.complete_date }}</span>
+                      </div>
+                    </div>
+                </a>
+            {% endfor %}
+        </div>
+    </div>
+{% endblock %}
