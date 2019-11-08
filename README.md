@@ -1,2 +1,3 @@
 # django-todo-app
-This To Do application in Django.
+First run `make build-no-cache` for starting application.
+`make dev-up` and `make dev-down` using for development. 
