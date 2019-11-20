@@ -24,3 +24,13 @@ class TodoUser(models.Model):
 
     def __str__(self):
         return "{0} {1}".format(self.user.email, self.todo.title)
+
+
+class Comment(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    todo = models.ForeignKey(Todo, on_delete=models.CASCADE)
+    message = models.TextField(blank=False)
+    created = models.DateTimeField(default=timezone.now)
+
+    def __str__(self):
+        return "{0}".format(self.user.email, self.todo.title)

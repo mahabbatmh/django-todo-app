@@ -12,7 +12,8 @@ services:
       - ./config/nginx:/etc/nginx/conf.d
     depends_on:
       - app
-  app:
+      - daphne
+  app: &app
     build: .
     container_name: todoapp
     env_file:
@@ -27,6 +28,7 @@ services:
       - ./src:/src
     expose:
       - "8012"
+      - "8000"
     links:
       - redis
       - rabbitmq
@@ -69,7 +71,30 @@ services:
     networks:
       - todoapp_network
     restart: on-failure
-
+  daphne:
+    <<: *app
+    container_name: todoapp_daphne
+    working_dir: /src/
+    command: sh -c "daphne -b 0.0.0.0 -p 8000 todoapp.asgi:application"
+    ports:
+      - 8000:8000
+    networks:
+      - todoapp_network
+    depends_on:
+      - redis
+    links:
+      - redis
+  worker:
+    <<: *app
+    working_dir: /src/
+    container_name: todoapp_worker
+    command: sh -c "python manage.py runworker channels"
+    networks:
+      - todoapp_network
+    depends_on:
+      - redis
+    links:
+      - redis
 networks:
   todoapp_network:
 

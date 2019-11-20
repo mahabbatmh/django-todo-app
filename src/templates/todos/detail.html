@@ -1,0 +1,138 @@
+{% extends 'index.html' %}
+{% load static %}
+{% block content %}
+    <div class="container">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">{{todo.title }}</h5>
+                <p class="card-text">{{ todo.description }}</p>
+                <span class="text-muted">{{ todo.complete_date }}</span>
+            </div>
+        </div>
+        <ul class="list-group mb-3 mt-3" id="comments">
+            <li class="list-group-item active">Comments</li>
+            {% for comment in comments %}
+                <li class="list-group-item">
+                <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                  <strong>{{ comment.user.email }}</strong> <br/> {{ comment.message }}
+                  {% if comment.user.id == user.id or is_owner %}
+                    <button type="button" class="close remove-comment" data-comment_id="{{ comment.id }}">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                  {% endif %}
+                </div>
+                </li>
+            {% endfor %}
+        </ul>
+        <div>
+            <div class="form-group">
+                <input type="text" id="comment_input" class="form-control"/>
+            </div>
+            <button class="btn btn-success mb-2" id="comment-btn" >Comment</button>
+        </div>
+        {% if is_owner %}
+            <div class="row">
+                {% for user in users %}
+                    <div class="col-4 form-check">
+                        <input id="user_{{ user.id }}" {% if user.has_access %}
+                               checked
+                        {% endif %}
+                               data-user_id="{{ user.id }}"
+                               data-todo_id="{{ todo.id }}"
+                               class="form-check-input todo-user"  type="checkbox"/>
+                        <label for="user_{{ user.id }}" class="form-check-label">{{ user.email }}</label>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    </div>
+{% endblock %}
+    {% block scripts %}
+        {% csrf_token %}
+        <script>
+        const commentSocket = new WebSocket(
+            'ws://' + window.location.host.split(":")[0] + ':8000'+
+             '/comments/' + '{{todo.id}}' + '/'
+        );
+
+        commentSocket.onmessage = function(event) {
+            let data = JSON.parse(event.data);
+            let socket_data = data['message'];
+            let current_user_id = {{ user.id }};
+            let is_owner = "{{ is_owner }}".toLowerCase();
+            document.querySelector('#comments').innerHTML += (
+                `<li class="list-group-item">
+                <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                  <strong>${socket_data.user_email}</strong> <br/> ${socket_data.message}
+                  ${
+                    current_user_id===socket_data.user_id || is_owner==="true"?
+                        `<button type="button" class="close remove-comment" data-comment_id=${socket_data.comment_id}>
+                        <span aria-hidden="true">&times;</span>
+                    </button>`:""
+                }
+                </div>
+                </li>`
+            );
+        };
+
+        commentSocket.onclose = function(event) {
+            console.error('Comment socket closed unexpectedly');
+        };
+
+        document.querySelector('#comment_input').focus();
+
+        document.querySelector('#comment_input').onkeyup = function(event){
+            if(event.keyCode === 13){
+                send_message(event.target.value);
+                event.target.value = '';
+            }
+        };
+
+        document.querySelector('#comment-btn').onclick = function (event) {
+            let message = document.querySelector('#comment_input').value;
+            if(message){
+                send_message(message);
+                document.querySelector('#comment_input').value = '';
+            }else{
+                document.querySelector('#comment_input').focus();
+            }
+        };
+
+        const send_message = message => {
+            commentSocket.send(JSON.stringify({
+                'message': message
+            }))
+        };
+
+        $(document).ready(function () {
+            $(".todo-user").change(function () {
+                    $.ajax({
+                        url: '/todo-user-rel',
+                        type: 'POST',
+                        data: {
+                            "user_id": this.dataset['user_id'],
+                            "todo_id": this.dataset['todo_id'],
+                            'csrfmiddlewaretoken': '{{csrf_token}}',
+                            del:this.checked
+                        },
+                        dataType: 'json'
+                    })
+            });
+            $(".remove-comment").click(function () {
+                $.ajax({
+                        url: '/remove-comment',
+                        type: 'POST',
+                        data: {
+                            "comment_id": this.dataset['comment_id'],
+                            "todo_id": "{{ todo.id }}",
+                            'csrfmiddlewaretoken': '{{csrf_token}}',
+                        },
+                        success: () => {
+                            $(this).closest(".list-group-item").remove();
+                        },
+                        dataType: 'json'
+                    })
+            })
+        });
+        </script>
+    {% endblock %}

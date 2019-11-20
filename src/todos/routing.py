@@ -1,8 +1,7 @@
-from channels.routing import route
-from .consumers import *
+from django.urls import re_path
 
-channel_routing = [
-    route('websocket.connect', ws_add, path=r'^/comments/(?P<id>[0-9]{4})$'),
-    route('websocket.receive', ws_message, path=r'^/comments/(?P<id>[0-9]{4})$'),
-    route('websocket.disconnect', ws_disconnect, path=r'^/comments/(?P<id>[0-9]{4})$'),
+from . import consumers
+
+websocket_urlpatterns = [
+    re_path(r'comments/(?P<todo_id>\w+)/$', consumers.CommentConsumer)
 ]

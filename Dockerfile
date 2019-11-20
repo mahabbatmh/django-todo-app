@@ -9,12 +9,15 @@ RUN mkdir /static
 
 WORKDIR /src
 
+
+#update os
+RUN apk update
+
+# install required libraries for os
+RUN apk add --no-cache gcc mailcap python3-dev build-base linux-headers pcre-dev postgresql-dev libffi-dev libressl-dev
+
 # install psycopg2
-RUN apk update \
-    && apk add --virtual build-deps gcc python3-dev musl-dev \
-    && apk add postgresql-dev \
-    && pip install psycopg2 \
-    && apk del build-deps
+RUN pip install psycopg2
 
 ADD ./src /src
 RUN pip install --upgrade pip
@@ -23,6 +26,7 @@ RUN pip install -r requirements.txt
 COPY ./entrypoint.sh /entrypoint.sh
 
 RUN chmod +x /entrypoint.sh
+
 
 COPY ./wait-for /wait-for
 
