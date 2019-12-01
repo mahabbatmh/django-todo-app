@@ -1,7 +1,14 @@
 from django.conf import settings
 from django.db import models
+from enum import Enum
 
 from django.utils import timezone
+
+
+class PermissionEnum(Enum):
+    READ = "100"
+    COMMENT = "110"
+    EDIT = "111"
 
 
 class Todo(models.Model):
@@ -20,7 +27,9 @@ class Todo(models.Model):
 class TodoUser(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     todo = models.ForeignKey(Todo, on_delete=models.CASCADE)
-    is_owner = models.BooleanField()
+    permission = models.CharField(max_length=3,
+                                  choices=[(permission, permission.value) for permission in PermissionEnum],
+                                  default=PermissionEnum.READ.value)
 
     def __str__(self):
         return "{0} {1}".format(self.user.email, self.todo.title)

@@ -1,7 +1,10 @@
 from asgiref.sync import async_to_sync
 from channels.generic.websocket import WebsocketConsumer
 import json
-from .models import Comment
+
+from django.core.exceptions import ObjectDoesNotExist
+
+from .models import Comment, TodoUser, PermissionEnum
 from django.core import serializers
 
 from django.contrib.auth.models import User
@@ -30,6 +33,18 @@ class CommentConsumer(WebsocketConsumer):
         text_data_json = json.loads(text_data)
         message = text_data_json['message']
         session_user = User.objects.get(username=self.scope['user'])
+        try:
+            todo_user = TodoUser.objects.get(todo_id=self.room_name, user=session_user,
+                                             permission__in=(PermissionEnum.COMMENT.value, PermissionEnum.EDIT.value))
+        except ObjectDoesNotExist:
+            async_to_sync(self.channel_layer.group_send)(
+                self.room_group_name,
+                {
+                    'type': 'comment_message',
+                    'message': 'ACCESS_DENIED'
+                }
+            )
+
         new_comment = Comment(todo_id=self.room_name, user=session_user, message=message)
         new_comment.save()
         async_to_sync(self.channel_layer.group_send)(

@@ -1,10 +1,10 @@
 import json
 
 import pytz
-from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.core.exceptions import ObjectDoesNotExist
+from django.db.models import Q
 from django.http import HttpResponseForbidden, HttpResponse, HttpResponseNotFound
 from django.shortcuts import render, redirect
 from django.db import transaction, Error
@@ -12,9 +12,8 @@ from datetime import timedelta
 import logging
 
 from .forms import TodoForm
-from .models import TodoUser, Comment
+from .models import TodoUser, Comment, PermissionEnum
 from .tasks import send_notification
-from django.utils import timezone
 
 logger = logging.getLogger('Django')
 
@@ -27,7 +26,7 @@ def create_view(request):
             with transaction.atomic():
                 local_timezone_str = form.cleaned_data['client_time_zone']
                 todo = form.save()
-                todo_user = TodoUser(user=request.user, todo=todo, is_owner=True)
+                todo_user = TodoUser(user=request.user, todo=todo, permission=PermissionEnum.EDIT.value)
                 todo_user.save()
                 local_timezone = pytz.timezone(local_timezone_str)
                 time_delay = local_timezone.localize(todo.complete_date).astimezone(pytz.utc) - timedelta(minutes=10)
@@ -60,15 +59,17 @@ def index(request):
 def detail_view(request, id):
     try:
         todo_user = TodoUser.objects.select_related().get(todo_id=id, user=request.user)
-        comments = Comment.objects.select_related().filter(todo_id=id).order_by('created')
+        comments = None
+        if todo_user.permission in (PermissionEnum.COMMENT.value, PermissionEnum.EDIT.value):
+            comments = Comment.objects.select_related().filter(todo_id=id).order_by('created')
     except ObjectDoesNotExist:
+        comments = None
         todo_user = None
-        comments = []
     try:
-        is_owner = TodoUser.objects.select_related().get(todo_id=id, user=request.user, is_owner=True)
+        is_owner = TodoUser.objects.select_related().get(todo_id=id, user=request.user,
+                                                         permission=PermissionEnum.EDIT.value)
     except ObjectDoesNotExist:
         is_owner = None
-
     if todo_user:
         users = User.objects.all().values()
         todos = TodoUser.objects.filter(todo_id=id).values()
@@ -80,9 +81,9 @@ def detail_view(request, id):
                     break
         context = {
             "todo": todo_user.todo,
-            "users": users,
             "is_owner": True if is_owner else False,
-            "comments": comments
+            "comments": comments,
+
         }
         return render(request, 'todos/detail.html', context)
     else:
@@ -91,15 +92,23 @@ def detail_view(request, id):
 
 def todo_user_view(request):
     if request.user.is_authenticated and request.POST:
-        if request.POST["del"] == "true":
-            TodoUser.objects.get_or_create(todo_id=request.POST["todo_id"], user_id=request.POST["user_id"],
-                                           is_owner=False)
-            res_json = json.dumps({'success': True})
+        form_data = request.POST
+        try:
+            todo_user_owner = TodoUser.objects.select_related().get(todo_id=form_data['todo_id'],
+                                                                    user=request.user,
+                                                                    permission=PermissionEnum.EDIT.value)
+            assign_user = User.objects.filter(Q(username=form_data['user_identificator']) |
+                                              Q(email=form_data['user_identificator'])).get()
+            try:
+                TodoUser.objects.get(user=assign_user, todo_id=form_data['todo_id']).delete()
+            except ObjectDoesNotExist:
+                pass
+            new_todo_user = TodoUser(user=assign_user, todo_id=form_data['todo_id'], permission=form_data['permission'])
+            new_todo_user.save()
+            res_json = json.dumps({'success': 'true'})
             return HttpResponse(res_json)
-        else:
-            TodoUser.objects.filter(todo_id=request.POST["todo_id"], user_id=request.POST["user_id"]).delete()
-            res_json = json.dumps({'success': True})
-            return HttpResponse(res_json)
+        except ObjectDoesNotExist:
+            return HttpResponseForbidden()
     else:
         return HttpResponseForbidden()
 
@@ -109,7 +118,7 @@ def remove_comment(request):
     if request.POST:
         try:
             comment = Comment.objects.select_related().get(id=request.POST['comment_id'])
-            todo_user = TodoUser.objects.get(todo_id=request.POST['todo_id'], user_id=request.user.id)
+            todo_user = TodoUser.objects.get(todo_id=request.POST['todo_id'], user=request.user)
             if not (comment.user.id == request.user.id or todo_user.is_owner):
                 return HttpResponseForbidden()
         except ObjectDoesNotExist:
